@@ -139,12 +139,76 @@ ratings %>%
 # https://5harad.com/papers/long_tail.pdf
 
 # Specifically, for the subset of users who rated at least 10 movies,
+num_ratings_per_movies <- ratings %>%
+  group_by(movie_id) %>%
+  summarize(num_ratings = n()) %>%
+  mutate(rank = rank(desc(num_ratings))) %>%
+  ungroup()
+
+
+ratings_plus <- inner_join(ratings, num_ratings_per_movies, by = "movie_id") %>% 
+  arrange(movie_id)
+
+# movie id, rating, user id, count, num_ratings, rank (popularity)
+ratings_by_top_users <- ratings_plus %>%
+  group_by(user_id) %>%
+  mutate(count = n()) %>%
+  filter(count >= 10) %>%
+  ungroup()
+
+hundred_cdf <- ratings_by_top_users %>%
+  group_by(user_id) %>%
+  arrange(rank) %>%
+  summarize(inventory_size = last(rank)) %>%
+  ungroup() %>%
+  group_by(inventory_size) %>% #
+  summarize(num_people_satisfied = n()) %>% #
+  arrange(inventory_size) %>% # 
+  mutate(cdf = cumsum(num_people_satisfied) / sum(num_people_satisfied))
+
+#ninety_cdf <- ratings_plus %>%
+#  group_by(user_id) %>%
+#  mutate(count = n()) %>%
+#  filter(count >= 10) %>%
+#  ungroup() %>%
+#  group_by(user_id) %>%
+#  summarize(rank_of_lowest_rating = quantile(rank, probs = .90)) %>% # NOTE: in this context, it's the rank of the cut-off movie for the lowest 10% of ratings per user, not the rank of the lowest rating per user
+
+ninety_cdf <- ratings_by_top_users %>%
+  group_by(user_id) %>%
+  arrange(rank) %>%
+  summarize(inventory_size = quantile(rank, probs = .90)) %>%
+  ungroup() %>%
+  group_by(inventory_size) %>% #
+  summarize(num_people_satisfied = n()) %>% #
+  arrange(inventory_size) %>% # 
+  mutate(cdf = cumsum(num_people_satisfied) / sum(num_people_satisfied))
+  
 # produce a plot that shows the fraction of users satisfied (vertical
 # axis) as a function of inventory size (horizontal axis). We will
-# define "satisfied" as follows: an individual user is satisfied p% of
-# the time at inventory of size k if at least p% of the movies they
-# rated are contained in the top k most popular movies. As in the
+# define "satisfied" as follows:AN INDIVIDUAL USER IS SATISFIED P% OF
+# THE TIME AT INVENTORY OF SIZE K IF AT LEAST P% OF THE MOVIES THEY
+# RATED ARE CONTAINED IN THE TOP K MOST POPULAR MOVIES.
+##### so 100% satisfaction = 100% of the movies
+# a user rated are contained in the "top K popular movies" (
+# since k is inventory size that's just the size of the catalog) = 
+# rank of lowest rated movie is included in the catolog
+##### so 90% satisfaction = 90% of the movies
+# a user rated are contained in the 
+# As in the
 # paper, produce one curve for the 100% user satisfaction level and
 # another for 90%---do not, however, bother implementing the null
 # model (shown in the dashed lines).
+
+hundred_cdf %>% 
+  ggplot(aes(x = inventory_size, y = cdf)) + 
+  geom_line() + 
+  geom_line(data = ninety_cdf, 
+            aes(x = inventory_size, y = cdf),
+            color = 'blue') + 
+  geom_vline(xintercept = 3000, linetype = 'dashed', color = 'red') + 
+  ylab('Percent of Users Satisfied') + 
+  xlab('Inventory Size') +
+  scale_y_continuous(label = percent) +
+  ggtitle('Anatomy of Long Tails')
 ```
