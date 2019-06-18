@@ -35,22 +35,50 @@ head(ratings) %>% kable()
 
 ```{r dist-ratings}
 # plot the distribution of rating values (slide 21)
-```
+ratings %>% 
+  ggplot(aes(x = rating)) +
+  geom_histogram(bins = 10, color = 'white', fill = 'indianred1') +
+  scale_y_continuous(label = comma) +
+  ylab('Number of Ratings') + 
+  xlab('Rating Level') + 
+  ggtitle('Distribution of Ratings')
+ ```
 
 ## Per-movie stats
 
 ```{r aggregate-by-movie}
 # aggregate ratings by movie, computing mean and number of ratings
+
+ratings_by_movie <- ratings %>%
+  group_by(movie_id) %>%
+  mutate(mean_rating = mean(rating),
+         count = n()
+         )
 # hint: use the n() function for easy counting within a group
 ```
 
 ```{r dist-movie-popularity}
 # plot distribution of movie popularity (= number of ratings the movie received)
+ratings_by_movie %>%
+  ggplot(aes(x = movie_id)) + 
+  geom_histogram(bins = 20, color = 'white', fill = 'indianred1') +
+  xlab('Movie ID') +
+  ylab('Number of Ratings') +
+  ggtitle('Distribution of Movie Popularity') + 
+  scale_x_log10(label = comma) + 
+  scale_y_continuous(label = comma)
 # hint: try scale_x_log10() for a logarithmic x axis
 ```
 
 ```{r dist-mean-ratings-by-movie}
 # plot distribution of mean ratings by movie (slide 23)
+ratings_by_movie %>%
+  ggplot(aes(x = mean_rating)) + 
+  geom_histogram(bins = 20, color = 'white', fill = 'indianred1') + 
+  xlim(c(1.5,5)) + 
+  ylab('Number of Movies') +
+  xlab('Average Rating') + 
+  ggtitle('Distribution of Mean Ratings by Movie')
 # hint: try geom_histogram and geom_density
 ```
 
@@ -59,7 +87,24 @@ head(ratings) %>% kable()
 # hint: use dplyr's rank and arrange functions, and the base R sum and cumsum functions
 # store the result in a new data frame so you can use it in creating figure 2 from the paper below
 
+cdf <- ratings_by_movie %>% 
+  select(movie_id,count) %>%
+  arrange(desc(count)) %>%
+  unique() %>%
+  ungroup() %>%
+  mutate(rank = rank(desc(count)),
+         cdf = cumsum(count) / sum(count)
+  )
+
 # plot the CDF of movie popularity
+
+cdf %>%
+  ggplot(aes(x = rank, y = cdf)) +
+  geom_line() +
+  scale_y_continuous(label = percent) + 
+  ylab('Cumulative Percent of Ratings') + 
+  xlab('Movie Rank') + 
+  ggtitle('Cumulative Movie Rank')
 ```
 
 
@@ -67,11 +112,24 @@ head(ratings) %>% kable()
 
 ```{r aggregate-by-user}
 # aggregate ratings by user, computing mean and number of ratings
+
+ratings_by_user <- ratings %>%
+  group_by(user_id) %>%
+  summarize(mean = mean(rating), count = n())
+  
 ```
 
 ```{r dist-user-activity}
 # plot distribution of user activity (= number of ratings the user made)
 # hint: try a log scale here
+ratings %>%
+  ggplot(aes(x = user_id)) + 
+  geom_histogram(bins = 100, color = 'white', fill = 'indianred1') + 
+  scale_y_continuous(label = comma) +
+  scale_x_log10(label = comma) + 
+  ylab("Number of Ratings") + 
+  xlab('User ID') +
+  ggtitle('Distribution of User Activity')
 ```
 
 # Anatomy of the long tail
