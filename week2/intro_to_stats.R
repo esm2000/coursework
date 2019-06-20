@@ -85,5 +85,30 @@ sd(magnets_control$change) # 1.578124
 boxplot(change ~ active, magnets)
 
 # Active patients have no outliers while control patients have
-# 3 outliers.
+# 3 outliers
+
+# Exercise 9.2
+# --------------------------------------------------------------
+
+# Assume that the expectation of the measurement is equal
+# to 3.5, regardless of what the type of treatment that 
+# the patient received. We take the
+# standard deviation of the measurement for patients the 
+# receives an active magnet to be equal to 3 and for those
+# that received the inactive placebo we take it to be equal 
+# to 1.5. Assume that the distribution of the measurements is
+# Normal and there are 29 patients in the first group and 21 
+# in the second. Find the interval that contains 95% of the
+# sampling distribution of the statistic.
+
+active_sim <- rnorm(29, 3.5, sd = 3)
+passive_sim <- rnorm(21, 3.5, sd = 1.5)
+total_sim <- append(active_sim, passive_sim)
+
+low_95 <- mean(total_sim) - (1.96 * sd(total_sim))
+high_95 <- mean(total_sim) / + (1.96 * sd(total_sim))
+confidence_95 <- c(low_95,high_95)
+
+confidence_95 # -1.5756877 - 0.7085026
+
 
