@@ -1,0 +1,201 @@
+---
+title: "Citibike Cross-Validation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r loading_data}
+library(tidyverse)
+library(modelr)
+library(scales)
+```
+
+
+
+
+
+```{r Exercise_1}
+trips_data <- read_tsv('trips_per_day.tsv')
+```
+
+```{r Exercise_2}
+sampled_trips_data <- sample_frac(trips_data,1) %>% 
+  mutate(count = row_number())
+
+training_set <- sampled_trips_data %>%
+  filter(count <= floor(.80 * nrow(sampled_trips_data)))
+
+validation_set <- sampled_trips_data %>%
+  filter(count > floor(.80 * nrow(sampled_trips_data)))
+
+
+```
+
+
+```{r Exercise_3}
+trips_model1 <- lm(num_trips ~ tmin, training_set)
+summary(trips_model1)
+
+training_set %>% add_predictions(trips_model1) %>% 
+  ggplot(aes(x = tmin)) + 
+  geom_point(aes(y = num_trips), color ="blue") +
+  geom_line(aes(y = pred), color = 'red', linetype = "dashed", lwd = 2)
+
+validation_set %>% add_predictions(trips_model1) %>% 
+  ggplot(aes(x = tmin)) + 
+  geom_point(aes(y = num_trips), color ="blue") +
+  geom_line(aes(y = pred), color = 'red', linetype = "dashed", lwd = 2)
+  
+# R-Squared Training
+training_set2 <- training_set %>% 
+  add_predictions(trips_model1)
+
+(cor(training_set2$pred,training_set2$num_trips))^2 # 0.6854682
+
+# R-Squared Validation
+validation_set2 <- validation_set %>% 
+  add_predictions(trips_model1)
+
+(cor(validation_set2$pred,validation_set2$num_trips))^2 #  0.65064
+
+# RMSE Training
+rmse(trips_model1, training_set) # 5752.095
+
+# RMSE Validation
+rmse(trips_model1, validation_set) # 6025.868
+```
+
+```{r Exercise_4}
+trips_model2 <- lm(num_trips ~ tmin + I(tmin^2), training_set)
+summary(trips_model2)
+
+training_set %>% add_predictions(trips_model2) %>% 
+  ggplot(aes(x = tmin)) + 
+  geom_point(aes(y = num_trips), color ="blue") +
+  geom_line(aes(y = pred), color = 'red', linetype = "dashed", lwd = 2)
+
+validation_set %>% add_predictions(trips_model2) %>% 
+  ggplot(aes(x = tmin)) + 
+  geom_point(aes(y = num_trips), color ="blue") +
+  geom_line(aes(y = pred), color = 'red', linetype = "dashed", lwd = 2)
+  
+# R-Squared Training
+training_set3 <- training_set %>% 
+  add_predictions(trips_model2)
+
+(cor(training_set3$pred,training_set3$num_trips))^2 # 0.6854846
+
+# R-Squared Validation
+validation_set3 <- validation_set %>% 
+  add_predictions(trips_model2)
+
+(cor(validation_set3$pred,validation_set3$num_trips))^2 # 0.6506801
+
+# RMSE Training
+rmse(trips_model2, training_set) # 5751.945
+
+# RMSE Validation
+rmse(trips_model2, validation_set) # 6025.484
+
+```
+
+```{r Exercise_5}
+k <- 10
+training_rsq <- rep(0,k)
+validation_rsq <- rep(0,k)
+
+for(i in 1:k){
+  trips_modelk <- lm(num_trips ~ poly(tmin, i, raw = TRUE), training_set)
+  
+# R-Squared Training
+training_setk <- training_set %>% 
+  add_predictions(trips_modelk)
+
+training_rsq[i] <- (cor(training_setk$pred,training_setk$num_trips))^2 
+
+# R-Squared Validation
+validation_setk <- validation_set %>% 
+  add_predictions(trips_modelk)
+
+validation_rsq[i] <- (cor(validation_setk$pred,validation_setk$num_trips))^2
+
+}
+
+training_rsq
+validation_rsq
+
+data.frame(1:10, validation_rsq, training_rsq) %>% 
+  ggplot(aes(x = X1.10)) +
+  geom_line(aes(y = validation_rsq), color = 'blue') + 
+  geom_point(aes(y = validation_rsq), color = 'blue') + 
+  geom_line(aes(y = training_rsq), color = 'red') + 
+  geom_point(aes(y = training_rsq), color = 'red') 
+```
+
+```{r Exercise_6}
+poly <- match(max(validation_rsq),validation_rsq)
+
+best_fit <- lm(num_trips ~ poly(tmin, poly, raw = TRUE), training_set)
+summary(best_fit)
+
+validation_set %>% 
+  add_predictions(best_fit) %>%
+  ggplot(aes(x = tmin)) + 
+  geom_point(aes(y = num_trips), color = 'blue') + 
+  geom_line(aes(y = pred), color = 'red', linetype = 'dashed', lwd = 2)
+```
+
+```{r Exercise_7}
+fold <- 5
+rmse <- rep(0,fold)
+for(j in 1:fold){
+
+# need to work on the way folds are selected (revamp for training_setj and validation_setj)
+
+
+
+}
+
+mean(rmse) # 5905.833
+sd(rmse)/sqrt(length(rmse)) # 386.4351
+
+
+k <- 10
+average_rmse <- rep(0,k)
+average_se <- rep(0,k)
+
+for(i in 1:k){
+  
+  rmse <- rep(0,fold)
+  for(j in 1:fold){
+    
+  training_setj <- sampled_trips_data %>%
+  mutate(cross = (row_number() + 5) %% 5) %>%
+  filter(cross != j - 1)
+
+  validation_setj <- sampled_trips_data %>%
+  mutate(cross = (row_number() + 5) %% 5) %>%
+  filter(cross == j - 1)
+  
+  rmse[j] <- rmse(lm(num_trips ~ poly(tmin, i, raw = TRUE), training_setj), validation_setj)
+
+  
+  }
+  
+  average_rmse[i] <- mean(rmse)
+  average_se[i] <- sd(rmse)/length(rmse)
+}
+
+data.frame(1:10, average_rmse, average_se) %>%
+  ggplot(aes(x = X1.10)) +
+  geom_point(aes(y = average_rmse), color = 'red') + 
+  geom_line(aes(y = average_rmse), color = 'red') + 
+  geom_point(aes(y = average_se), color = 'blue') + 
+  geom_line(aes(y = average_se), color = 'blue')  
+
+match(min(average_rmse), average_rmse)
+```
