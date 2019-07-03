@@ -1,0 +1,101 @@
+---
+title: "Predicting Daily Citibike Trips"
+output: html_notebook
+---
+
+Packages
+```{r Packages}
+library(tidyverse)
+library(modelr)
+library(scales)
+library(lubridate)
+```
+
+Loading and Organizing the Data + Model Creation
+```{r Set Up}
+
+# loading data in
+trips <- read_tsv('trips_per_day.tsv')
+holidays <- read_csv('holiday_2014.csv') %>% 
+  mutate(is_holiday = TRUE)
+
+# creating a column to categorize whether a day is in the 
+# weekend or not
+
+trips <- trips %>%
+  mutate(month = month(ymd)) %>%
+  mutate(day = wday(ymd)) %>%
+  mutate(is_weekend = day == 1 | day == 7)
+
+# creation of a column to categorize whether a day is a holiday
+# or not
+trips <- left_join(trips, holidays)
+trips$is_holiday <- replace_na(trips$is_holiday, FALSE)
+  
+
+```
+
+Now, the five models will be analyzed through cross-validation
+```{r Cross Validation}
+# Model Creation
+model1 <- lm(num_trips ~ month*(prcp + snow) + tmin, training_set)
+model2 <- lm(num_trips ~ month*(prcp) + tmin + is_holiday + is_weekend, training_set)
+model3 <- lm(num_trips ~ prcp + tmin + is_holiday + is_weekend, training_set)
+model4 <- lm(num_trips ~ poly(prcp, 2, raw = TRUE) + tmin + is_holiday + is_weekend, training_set)
+model5 <- lm(num_trips ~ poly(prcp, 3, raw = TRUE) + tmin + is_holiday + is_weekend, training_set)
+model6 <- lm(num_trips ~ poly(prcp, 4, raw = TRUE) + tmin + is_holiday + is_weekend, training_set)
+
+# bonus model
+model7 <- lm(num_trips ~ poly(prcp, 4, raw = TRUE) + poly(tmin, 3, raw = TRUE) + is_holiday + is_weekend, training_set)
+
+fold <- 5
+trips_sample <- sample_frac(trips, size = 1) %>%
+  mutate(cross = row_number() %% 5 + 1)
+average_rmse <- rep(0,fold)
+
+rmse <- rep(0,fold)
+rsq <- rep(0,fold)
+
+for(i in 1:fold){
+  
+  # training set and validation set creation
+  training_set <- trips_sample %>%
+    filter(cross != i)
+  
+  validation_set <- trips_sample %>%
+    filter(cross == i)  
+  
+  # Test Statistics
+  rmse[i] <- rmse(model7,validation_set)
+  rsq[i] <- rsquare(model7,validation_set)
+  
+}
+
+mean(rmse)
+mean(rsq)
+```
+
+Plot the best-fit model.
+
+```{r Plotting}
+
+trips %>%
+  add_predictions(model7) %>%
+  ggplot(aes(x = ymd)) + 
+  geom_point(aes(y = num_trips), color = 'blue') + 
+  geom_line(aes(y = pred), color = 'red')
+
+trips %>%
+  add_predictions(model7) %>%
+  ggplot(aes(x = pred, y = num_trips)) + 
+  geom_point() + 
+  geom_abline(aes(slope = 1, intercept = 0), 
+              color = 'red', lwd = 1.5)  
+  
+```
+
+Saving the model as an object
+
+```{r model save}
+save(model7, 'model7', file = 'Emeka Model.RData')
+```
